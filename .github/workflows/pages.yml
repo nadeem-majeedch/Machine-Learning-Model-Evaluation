@@ -1,0 +1,60 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install nbconvert
+        run: pip install nbconvert
+
+      - name: Render notebooks to HTML
+        run: |
+          jupyter nbconvert --to html --embed-images ML_Model_Evaluation_Simple.ipynb
+          jupyter nbconvert --to html --embed-images ML_Model_Evaluation.ipynb
+
+      - name: Assemble site
+        run: |
+          mkdir -p _site
+          mv ML_Model_Evaluation_Simple.html _site/
+          mv ML_Model_Evaluation.html _site/
+          cp ML_Model_Evaluation_Cheat_Sheet.pdf ML_Model_Evaluation_Cheat_Sheet.png _site/
+          cp ML_Model_Evaluation_Study_Map.pdf ML_Model_Evaluation_Study_Map.png _site/
+          python build_index.py
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
